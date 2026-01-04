@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clickhouse-view-deps"
+version = "0.1.0"
+description = "Extract ClickHouse VIEW dependencies using ClickHouse ANTLR grammar"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "Dmitry Sergeev, https://github.com/dmserg" }
+]
+
+dependencies = [
+  "clickhouse-connect>=0.7.0",
+  "antlr4-python3-runtime>=4.13.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4",
+  "black>=24.0",
+  "ruff>=0.4.0",
+  "mypy>=1.8.0",
+  "types-setuptools"
+]
+
+[project.scripts]
+ch-view-deps = "ch_view_deps:main"
+
+# -----------------------------
+# Packaging configuration
+# -----------------------------
+
+[tool.setuptools]
+zip-safe = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+  "ch_view_deps",
+  "generated_ch_parser*"
+]
+
+# -----------------------------
+# Tooling
+# -----------------------------
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "I", "B"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra"
+testpaths = ["tests"]

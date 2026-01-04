@@ -1,0 +1,2 @@
+ClickHouse grammar from https://github.com/ClickHouse/ClickHouse/blob/master/utils/antlr
+Generate via `java -jar antlr-4.13.2-complete.jar -Dlanguage=Python3 -no-listener -visitor -o generated_ch_parser ClickHouseLexer.g4 ClickHouseParser.g4`
