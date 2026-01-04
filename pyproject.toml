@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "clickhouse-view-deps"
+name = "clickhouse-view-dependencies"
 version = "0.1.0"
 description = "Extract ClickHouse VIEW dependencies using ClickHouse ANTLR grammar"
 readme = "README.md"
@@ -28,7 +28,7 @@ dev = [
 ]
 
 [project.scripts]
-ch-view-deps = "ch_view_deps:main"
+ch-view-deps = "ch_view_dependencies:main"
 
 # -----------------------------
 # Packaging configuration
