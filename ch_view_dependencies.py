@@ -25,7 +25,7 @@ Generate parser from ClickHouse grammar (one-time):
 
 Run:
   CH_HOST=localhost CH_PORT=8123 CH_USER=default CH_PASSWORD= CH_DATABASE=default \
-  python3 ch_view_deps.py
+  python3 ch_view_deps.py <output.mmd>
 
 Output:
 - Prints JSON to stdout
@@ -33,11 +33,12 @@ Output:
 
 from __future__ import annotations
 
-import json
+import argparse
 import os
 import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
+from pathlib import Path
 
 import clickhouse_connect
 
@@ -55,7 +56,7 @@ from antlr4 import CommonTokenStream, InputStream
 from generated_ch_parser.ClickHouseLexer import ClickHouseLexer
 from generated_ch_parser.ClickHouseParser import ClickHouseParser
 from generated_ch_parser.ClickHouseParserVisitor import ClickHouseParserVisitor
-from dependencies_to_mermaid import json_to_mermaid
+from dependencies_to_mermaid import MermaidOptions, json_to_mermaid
 
 # ----------------------------
 # Helpers
@@ -306,6 +307,22 @@ def fetch_views(client, include_system: bool = False) -> List[Tuple[str, str, st
     rows = client.query(sql).result_rows
     return [(r[0], r[1], r[2]) for r in rows]
 
+def fetch_tables(client, include_system: bool = False) -> List[Tuple[str, str, str]]:
+    """
+    Returns list of (database, name, engine).
+    Includes Tables.
+    """
+    where_db = "" if include_system else "AND database NOT IN ('system', 'INFORMATION_SCHEMA', 'information_schema')"
+    sql = f"""
+        SELECT database, name, engine
+        FROM system.tables
+        WHERE engine NOT LIKE '%View%'
+          {where_db}
+        ORDER BY database, name
+    """
+    rows = client.query(sql).result_rows
+    return [(r[0], r[1], r[2]) for r in rows]
+
 def fetch_view_ddl(client, database: str, name: str) -> str:
     """
     Prefer system.tables.create_table_query (fast), fallback to SHOW CREATE TABLE.
@@ -348,16 +365,34 @@ def _views_to_json(client, views):
 # ----------------------------
 
 def main() -> None:
+
+    parser = argparse.ArgumentParser(
+        description="Generates Mermaid .mmd diagram from ClickHouse VIEWS dependencies."
+    )
+    
+    parser.add_argument(
+        "output",
+        help="Path to output .mmd file."
+    )
+
+    args = parser.parse_args()
+        
     ci = get_conn_info_from_env()
     client = connect_ch(ci)
 
+    print(f"Fetching views and tables from ClickHouse at {ci.host}:{ci.port}...")
     views = fetch_views(client, include_system=False)
+    tables = {f"{db}.{name}" for db, name, _ in fetch_tables(client, include_system=False)}
 
     payload = _views_to_json(client, views)    
-    print(json.dumps(payload, indent=2, ensure_ascii=False))
-    mermaid_graph = json_to_mermaid(payload)
-    print("\n\n# Mermaid Dependency Graph\n")
-    print(mermaid_graph)
-
+   
+    print(f"Converting to Mermaid diagram...")
+    mermaid_graph = json_to_mermaid(payload, tables, options=MermaidOptions(include_isolated_nodes=False))
+   
+    print(f"Writing Mermaid diagram to: {args.output}")
+    out_path = Path(args.output)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(mermaid_graph, encoding="utf-8", newline="\n")
+   
 if __name__ == "__main__":
     main()

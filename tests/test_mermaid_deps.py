@@ -31,7 +31,9 @@ def test_json_to_mermaid_happy_path_edges_no_quotes():
         "errors": {},
     }
 
-    out = json_to_mermaid(data)
+    tables = {"test.car", "test.household", "test.household_member", "test.pet", "test.human"}
+
+    out = json_to_mermaid(data, tables)
 
     assert out.startswith("graph LR\n")
 
@@ -42,6 +44,12 @@ def test_json_to_mermaid_happy_path_edges_no_quotes():
     assert "  test.car -.-> test.v_car_inventory\n" in out
     assert "  test.v_household_flags -.-> test.v_city_household_flag_stats\n" in out
     assert "  test.v_household_flags -.-> test.v_household_health_score\n" in out
+
+    # spot-check a few nodes with correct classes
+    assert "  test.car:::chTable" in out
+    assert "  test.household:::chTable" in out
+    assert "  test.v_household_flags:::chView" in out
+    assert "  test.v_household_health_score:::chView" in out
 
 
 def test_direction_option_changes_header():
@@ -145,16 +153,3 @@ def test_loads_json_to_mermaid_invalid_json_raises():
 def test_loads_json_to_mermaid_top_level_not_object_raises():
     with pytest.raises(MermaidDependencyGraphError, match="Top-level JSON must be an object"):
         loads_json_to_mermaid('["not an object"]')
-
-
-def test_invalid_node_name_with_space_raises():
-    # Space isn't allowed since we must keep names unquoted
-    data = {"view_dependencies": {"bad name": ["b"]}}
-    with pytest.raises(MermaidDependencyGraphError, match="Invalid node name"):
-        json_to_mermaid(data)
-
-
-def test_invalid_node_name_with_quote_raises():
-    data = {"view_dependencies": {'a"b': ["b"]}}
-    with pytest.raises(MermaidDependencyGraphError, match="Invalid node name"):
-        json_to_mermaid(data)

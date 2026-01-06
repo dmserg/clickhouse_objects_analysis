@@ -22,13 +22,9 @@ class MermaidDependencyGraphError(ValueError):
     pass
 
 
-# Conservative allow-list for unquoted Mermaid node ids in flowcharts.
-# Allows common database-like identifiers such as: schema.table, db.schema.table, a_b, a-b, a:b
-_ALLOWED_NODE_RE = re.compile(r"^[A-Za-z0-9_.:\-]+$")
-
-
 def json_to_mermaid(
     data: Mapping[str, Any],
+    tables: Set[str] = {},
     *,
     options: MermaidOptions = MermaidOptions()
 ) -> str:
@@ -68,7 +64,7 @@ def json_to_mermaid(
 
         view_deps[view] = deps_list
 
-    return _deps_to_mermaid(view_deps, options=options)
+    return _deps_to_mermaid(view_deps, tables, options=options)
 
 
 def loads_json_to_mermaid(
@@ -92,6 +88,7 @@ def loads_json_to_mermaid(
 
 def _deps_to_mermaid(
     view_deps: Mapping[str, Sequence[str]],
+    tables: Set[str],
     *,
     options: MermaidOptions
 ) -> str:
@@ -104,11 +101,9 @@ def _deps_to_mermaid(
     edges: List[Tuple[str, str]] = []
 
     for view, deps in view_deps.items():
-        _validate_node_name(view)
         nodes.add(view)
 
         for dep in deps:
-            _validate_node_name(dep)
             nodes.add(dep)
             edges.append((dep, view))
 
@@ -121,11 +116,23 @@ def _deps_to_mermaid(
                 deduped.append(e)
         edges = deduped
 
-    lines: List[str] = [f"graph {direction}"]
+    lines: List[str] = [f"graph {direction}",
+                        f"{options.indent}classDef chTable fill:#ffdd00,stroke:#000000,stroke-width:2px,color:#000000",
+                        f"{options.indent}classDef chView fill:#d6e4f8,stroke:#154360,stroke-width:2px,color:#154360",
+                        ""]
 
+    # Render nodes with types
+    for n in nodes:
+        if n in tables:
+            lines.append(f"{options.indent}{n}:::chTable")
+        else:
+            lines.append(f"{options.indent}{n}:::chView")
+
+    lines.append("")
+
+    # Render edges
     if edges:
         for src, dst in edges:
-            # IMPORTANT: no quotes around node names
             lines.append(f"{options.indent}{src} -.-> {dst}")
     elif options.include_isolated_nodes:
         for n in sorted(nodes):
@@ -142,17 +149,3 @@ def _deps_to_mermaid(
             lines.append(f"{options.indent}{n}")
 
     return "\n".join(lines) + "\n"
-
-
-def _validate_node_name(name: str) -> None:
-    """
-    Validate node name for unquoted Mermaid usage.
-
-    Since the user requires NO quotes, we enforce a conservative safe set:
-    - Letters/digits/underscore/dot/colon/hyphen
-    """
-    if not _ALLOWED_NODE_RE.match(name):
-        raise MermaidDependencyGraphError(
-            f"Invalid node name for unquoted Mermaid output: {name!r}. "
-            "Allowed pattern: [A-Za-z0-9_.:-]+ (no spaces, quotes, brackets, slashes, etc.)"
-        )
